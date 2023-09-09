@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\buildMultiTargeting\OszkarUrban_zap_prog.props" />
+</Project>

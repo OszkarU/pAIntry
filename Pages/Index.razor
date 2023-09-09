@@ -1,0 +1,265 @@
+﻿@page "/"
+@using OpenAI_API;
+@using OpenAI_API.Models;
+@using OpenAI_API.Completions;
+@using System;
+@using System.Text.Json;
+
+
+<div class="page-container">
+	<h3 class="text-center">pAIntry</h3>
+	<div class="main-container">
+		<div class="left-side">
+			<div class="image-grid-container @((recipe == null && generating == false) ? "image-grid-container" : "image-grid-container2")">
+				<div class="image-grid">
+					@foreach (var image in Images)
+					{
+						<div class="card @(image.Selected ? "selected-outline" : "")" @onclick="() => ToggleSelection(image)">
+							<div class="card-img-container">
+								<img src="@image.Path" class="card-img-top square-image" alt="@image.Alt">
+
+							</div>
+							<div class="card-body">
+								<p class="card-text">@image.Description</p>
+							</div>
+						</div>
+					}
+				</div>
+			</div>
+			<div class="button-container @((recipe == null && generating == false) ? "button-container" : "button-container2")">
+				<button class="btn btn-secondary" @onclick="OpenAddIngredientModal">Add ingredient</button>
+				<button class="btn btn-primary" @onclick="GenerateRecipe">Generate recipe</button>
+
+			</div>
+
+		</div>
+
+		<div class="right-side  @((recipe == null && generating == false) ? "hidden" : "visible2")">
+
+			<div class="skeleton-card">
+				
+				<div class="original-content @(generating == true ? "visible" : "hidden")">
+					<div class="skeleton skeleton-text-header"></div>
+					<div class="skeleton-container">
+						<div class="skeleton skeleton-text-image"></div>
+						<div class="short-text-wrapper">
+							<div class="skeleton skeleton-short-text"></div>
+							<div class="skeleton skeleton-short-text"></div>
+							<div class="skeleton skeleton-short-text"></div>
+							<div class="skeleton skeleton-short-text"></div>
+						</div>
+					</div>
+					<div class="skeleton skeleton-text"></div>
+					<div class="skeleton skeleton-text"></div>
+					<div class="skeleton skeleton-text"></div>
+					<div class="skeleton skeleton-text"></div>
+					<div class="skeleton skeleton-text"></div>
+					<div class="skeleton skeleton-text"></div>
+					<div class="skeleton skeleton-text"></div>
+					<div class="skeleton skeleton-text"></div>
+				</div>
+
+				@if (recipe != null && recipe.ingredients != null && recipe.instructions != null)
+				{
+					<div class="recipe-content">
+							<h4>@recipe.name</h4>
+							<h5>Ingredients</h5>
+								<ul class="">
+									@foreach (var ingredient in recipe.ingredients)
+									{
+										<li>@ingredient</li>
+									}
+								</ul>
+						<h5>Instructions</h5>
+
+								<ul class="">
+									@foreach (var instruction in recipe.instructions)
+									{
+										<li>@instruction</li>
+									}
+								</ul>
+						
+					</div>
+				}
+								
+			</div>
+		</div>
+	</div>
+
+	
+	@if (showAddIngredientModal)
+	{
+		<div class="modal-overlay">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h4>Add ingredient</h4>
+					</div>
+					<div class="modal-body">
+						<label for="ingredientName">Name:</label>
+						<input type="text" id="ingredientName" @bind="newIngredientName" />
+					</div>
+					<div class="modal-footer">
+						<button class="btn btn-primary" @onclick="AddIngredient">Add</button>
+						<button class="btn btn-secondary" @onclick="CloseAddIngredientModal">Cancel</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+</div>
+
+@code {
+	public class ImageInfo
+	{
+		public string Path { get; set; }
+		public string Alt { get; set; }
+		public string Description { get; set; }
+		public bool Selected { get; set; }
+
+		public ImageInfo(string path, string alt, string description)
+		{
+			Path = path;
+			Alt = alt;
+			Description = description;
+		}
+	}
+
+	List<ImageInfo> Images = new List<ImageInfo>
+	{
+		new ImageInfo("sample-data/beef.jpg", "Image Beef", "Beef"),
+		new ImageInfo("sample-data/potatoes.jpg", "Image Potatoes", "Potatoes"),
+		new ImageInfo("sample-data/ham.jpg", "Image Ham", "Ham"),
+		new ImageInfo("sample-data/milk.jpg", "Image Milk", "Milk"),
+		new ImageInfo("sample-data/mushrooms.jpg", "Image Mushrooms", "Mushrooms"),
+		new ImageInfo("sample-data/tomatoes.jpg", "Image Tomatoes", "Tomatoes"),
+		new ImageInfo("sample-data/rice.jpg", "Image Rice", "Rice"),
+		new ImageInfo("sample-data/eggs.jpg", "Image Eggs", "Eggs"),
+		new ImageInfo("sample-data/cheese.jpg", "Image Cheese", "Cheese"),
+	};
+
+	class Recipe
+	{
+		public string? name { get; set; }
+		public List<string>? ingredients { get; set; }
+		public List<string>? instructions { get; set; }
+	}
+
+
+
+	bool showAddIngredientModal = false;
+	string newIngredientName = string.Empty;
+
+	List<string> SelectedImageDescriptions = new List<string>();
+
+	Recipe? recipe;
+	bool generating = false;
+
+	OpenAIAPI client = new OpenAIAPI("YOUR_OPENAI_API_KEY"); //There is a more secure way to achieve this. I am aware.
+
+	private async Task GenerateRecipe()
+	{
+		generating = true;
+		recipe = null;
+
+		string prompt = $"Create a recipe using only these following ingredients: {string.Join(", ", SelectedImageDescriptions)}. You are not allowed to use ay other ingredients. Return your response in a JSON format like this:" +
+		"{" +
+		"   \"name\": \"Name of Recipe\"," +
+		"   \"ingredients\": [" +
+		"       \"ingredient 1\"," +
+		"       \"ingredient 2\"," +
+		"       \"ingredient 3\"," +
+		"       \"etc.\"" +
+		"   ]," +
+		"   \"instructions\": [" +
+		"       \"instruction 1\"," +
+		"       \"instruction 2\"," +
+		"       \"instruction 3\"" +
+		"       \"etc.\"" +
+		"   ]" +
+		"}";
+
+		// Configuration for generating a recipe using the OpenAI API.
+		var parameters = new CompletionRequest 
+			{
+				Model = "text-davinci-003",
+				Prompt = prompt,
+				Temperature = 0.3,
+				MaxTokens = 500
+			};
+
+		try
+		{
+			var response = await client.Completions.CreateCompletionAsync(parameters);
+
+			var generatedText = response.Completions[0].Text;
+
+			recipe = JsonSerializer.Deserialize<Recipe>(generatedText);  //Process the generated text as needed
+
+			if (recipe != null && recipe.ingredients!=null && recipe.instructions!=null){
+				//Console log to make sure the result is what is expected
+				Console.WriteLine($"Name: {recipe.name}");
+
+				Console.WriteLine("Ingredients:");
+				foreach (string ingredient in recipe.ingredients){
+					Console.WriteLine(ingredient);
+				}
+
+				Console.WriteLine("Instructions:");
+				foreach (string instruction in recipe.instructions){
+					Console.WriteLine(instruction);
+				}
+			}
+
+			generating = false;	
+		}
+		catch
+		{
+			Console.WriteLine("Ups! An error occured, please try generating the recipe once again.");
+		}
+
+	}
+
+	//Open and close the Modal that allows to Add new Ingredient to our "pantry"
+	private void OpenAddIngredientModal() 
+	{
+		showAddIngredientModal = true;
+	}
+
+	private void CloseAddIngredientModal()
+	{
+		showAddIngredientModal = false;
+		newIngredientName = string.Empty;
+	}
+
+	//Adding the ingredient to the "pantry", neccessary changes regarding the image
+	private void AddIngredient()
+	{
+		if (!string.IsNullOrWhiteSpace(newIngredientName))
+		{
+			int counter = Images.Count + 1;
+			var newImageInfo = new ImageInfo("sample-data/ingredients.png", $"Image {newIngredientName}", newIngredientName);
+			Images.Add(newImageInfo);
+			CloseAddIngredientModal();
+		}
+	}
+
+	//Select and unselect ingredients considered for the recipe
+	private void ToggleSelection(ImageInfo image)
+	{
+		image.Selected = !image.Selected;
+
+		if (image.Selected)
+		{
+			SelectedImageDescriptions.Add(image.Description);
+		}
+		else
+		{
+			SelectedImageDescriptions.Remove(image.Description);
+		}
+	}
+
+	
+
+	
+}

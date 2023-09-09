@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\OszkarUrban_zap_prog.props" />
+</Project>
